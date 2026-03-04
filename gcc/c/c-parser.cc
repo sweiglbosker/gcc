@@ -24980,6 +24980,7 @@ c_parser_omp_next_tokens_can_be_canon_loop (c_parser *parser,
 	  {
 	  case PRAGMA_OMP_UNROLL:
 	  case PRAGMA_OMP_TILE:
+	  case PRAGMA_OMP_REVERSE:
 	    return true;
 	  default:
 	    break;
@@ -25005,6 +25006,7 @@ c_parser_omp_next_tokens_can_be_canon_loop (c_parser *parser,
 
 static tree c_parser_omp_tile (location_t, c_parser *, bool *);
 static tree c_parser_omp_unroll (location_t, c_parser *, bool *);
+static tree c_parser_omp_reverse (location_t, c_parser *, bool *);
 
 /* This function parses a single level of a loop nest, invoking itself
    recursively if necessary.
@@ -25062,6 +25064,28 @@ c_parser_omp_loop_nest (c_parser *parser, bool *if_p)
       int count = 0;
       switch (c_parser_peek_token (parser)->pragma_kind)
 	{
+	case PRAGMA_OMP_REVERSE:
+	  c_parser_consume_pragma (parser);
+	  body = push_stmt_list ();
+	  transform = c_parser_omp_reverse (loc, parser, if_p);
+	  body = pop_stmt_list (body);
+	  if (transform == NULL_TREE || transform == error_mark_node)
+	    {
+	      transform = error_mark_node;
+	      break;
+	    }
+	  gcc_assert (TREE_CODE (transform) == OMP_REVERSE);
+
+	  if (omp_for_parse_state->count - depth > 1)
+	    {
+	      error_at (loc, "%<reverse%> construct generates just one loop with"
+		             "canonical form but %d loops are needed",
+		             omp_for_parse_state->count - depth);
+	      transform = error_mark_node;
+	    }
+	  else
+	    count = 1;
+	  break;
 	case PRAGMA_OMP_UNROLL:
 	  c_parser_consume_pragma (parser);
 	  body = push_stmt_list ();
@@ -26324,6 +26348,25 @@ c_parser_omp_parallel (location_t loc, c_parser *parser,
   stmt = c_finish_omp_parallel (loc, clauses, block);
 
   return stmt;
+}
+
+/* OpenMP 6.0
+   # pragma omp reverse new-line
+     structured-block
+
+  LOC is the location of the #pragma token.
+*/
+static tree c_parser_omp_reverse(location_t loc, c_parser *parser, bool *if_p) {
+  tree block, ret;
+
+  c_parser_skip_to_pragma_eol(parser, false);
+
+  block = c_begin_compound_stmt(true);
+  ret = c_parser_omp_for_loop(loc, parser, OMP_REVERSE, NULL_TREE, NULL, if_p);
+
+	block = c_end_compound_stmt(loc, block, true);
+  add_stmt(block);
+  return ret;
 }
 
 /* OpenMP 2.5:
@@ -30949,6 +30992,9 @@ c_parser_omp_construct (c_parser *parser, bool *if_p)
     case PRAGMA_OMP_PARALLEL:
       strcpy (p_name, "#pragma omp");
       stmt = c_parser_omp_parallel (loc, parser, p_name, mask, NULL, if_p);
+      break;
+    case PRAGMA_OMP_REVERSE:
+      stmt = c_parser_omp_reverse (loc, parser, if_p);
       break;
     case PRAGMA_OMP_SCOPE:
       stmt = c_parser_omp_scope (loc, parser, if_p);

@@ -835,6 +835,7 @@ cp_gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p)
     case OMP_TASKLOOP:
     case OMP_TILE:
     case OMP_UNROLL:
+    case OMP_REVERSE:
       ret = cp_gimplify_omp_for (expr_p, pre_p);
       break;
 
@@ -1613,6 +1614,7 @@ cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data_)
     case OMP_TASKLOOP:
     case OMP_TILE:
     case OMP_UNROLL:
+    case OMP_REVERSE:
     case OACC_LOOP:
       cp_walk_tree (&OMP_FOR_BODY (stmt), cp_fold_r, data, NULL);
       cp_walk_tree (&OMP_FOR_CLAUSES (stmt), cp_fold_r, data, NULL);
@@ -2525,6 +2527,7 @@ cp_genericize_r (tree *stmt_p, int *walk_subtrees, void *data)
     case OMP_LOOP:
     case OMP_TILE:
     case OMP_UNROLL:
+    case OMP_REVERSE:
     case OACC_LOOP:
       /* These cases are handled by shared code.  */
       c_genericize_control_stmt (stmt_p, walk_subtrees, data,

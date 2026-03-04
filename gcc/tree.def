@@ -1260,6 +1260,10 @@ DEFTREECODE (OMP_TILE, "omp_tile", tcc_statement, 7)
    Operands like for OMP_FOR.  */
 DEFTREECODE (OMP_UNROLL, "omp_unroll", tcc_statement, 7)
 
+/* OpenMP - #pragma omp reverse
+   Operands like for OMP_FOR.  */
+DEFTREECODE (OMP_REVERSE, "omp_reverse", tcc_statement, 7)
+
 /* OpenACC - #pragma acc loop [clause1 ... clauseN]
    Operands like for OMP_FOR.  */
 DEFTREECODE (OACC_LOOP, "oacc_loop", tcc_statement, 7)

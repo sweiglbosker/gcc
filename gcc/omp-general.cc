@@ -4819,6 +4819,80 @@ omp_apply_tile (tree for_stmt, tree sizes, int size)
     }
 }
 
+/*
+  for (i = start; i < end; i <op>= incr)
+
+  example:
+    for (int j1 = 0; j1 < 8; ++j1) ->
+    for (int j1 = 7; j1 >= 0; --j1)
+
+  1. compute the last iteration number of the loop
+  2. negate test-expr
+  3. reverse incr-expr
+*/
+static void
+omp_apply_reverse (tree for_stmt)
+{
+  if (OMP_FOR_NON_RECTANGULAR (for_stmt))
+    {
+      error_at (EXPR_LOCATION (for_stmt), "non-rectangular %<reverse%>");
+      return;
+    }
+
+  gcc_assert (TREE_VEC_LENGTH (OMP_FOR_INIT (for_stmt)) == 1);
+  tree init = TREE_VEC_ELT (OMP_FOR_INIT (for_stmt), 0);
+  tree cond = TREE_VEC_ELT (OMP_FOR_COND (for_stmt), 0);
+
+  tree start = save_expr (TREE_OPERAND (init, 1));
+  tree end;
+  tree step;
+  tree iters = omp_loop_number_of_iterations (for_stmt, 0, &step);
+
+  tree decl = TREE_OPERAND (init, 0);
+  tree type = TREE_TYPE (decl);
+  bool is_ptr = POINTER_TYPE_P (type);
+
+  tree stype = is_ptr ? sizetype : type;
+  tree incrs = fold_build2 (MINUS_EXPR, TREE_TYPE (iters), iters,
+			    build_one_cst (TREE_TYPE (iters)));
+  tree offset
+    = fold_build2 (MULT_EXPR, stype, fold_convert (stype, incrs), step);
+
+  end = fold_build2 (is_ptr ? POINTER_PLUS_EXPR : PLUS_EXPR, type, start,
+		     fold_convert (stype, offset));
+
+  tree_code cond_code = TREE_CODE (cond);
+  omp_adjust_for_condition (EXPR_LOCATION (for_stmt), &cond_code,
+			    &TREE_OPERAND (cond, 1), decl, step);
+  switch (cond_code)
+    {
+    case LT_EXPR:
+      cond_code = GE_EXPR;
+      break;
+    case GT_EXPR:
+      cond_code = LE_EXPR;
+      break;
+    default:
+      gcc_unreachable ();
+    }
+
+  tree neg_step = fold_build1 (NEGATE_EXPR, stype, step);
+  tree neg_incr;
+  if (is_ptr)
+    neg_incr = build2 (MODIFY_EXPR, type, decl,
+		       build2 (POINTER_PLUS_EXPR, type, decl,
+			       fold_convert (sizetype, neg_step)));
+  else
+    neg_incr = build2 (MODIFY_EXPR, type, decl,
+		       build2 (PLUS_EXPR, type, decl, neg_step));
+
+  TREE_OPERAND (init, 1) = save_expr (end);
+  TREE_OPERAND (cond, 1) = start;
+  TREE_SET_CODE (cond, cond_code);
+  TREE_VEC_ELT (OMP_FOR_INCR (for_stmt), 0) = neg_incr;
+}
+
+
 /* Callback for walk_tree to find nested loop transforming construct.  */
 
 static tree
@@ -4830,6 +4904,7 @@ find_nested_loop_xform (tree *tp, int *walk_subtrees, void *data)
     {
     case OMP_TILE:
     case OMP_UNROLL:
+    case OMP_REVERSE:
       pdata[1] = tp;
       return *tp;
     case BIND_EXPR:
@@ -4866,6 +4941,7 @@ omp_maybe_apply_loop_xforms (tree *expr_p, tree for_clauses)
     {
     case OMP_TILE:
     case OMP_UNROLL:
+    case OMP_REVERSE:
       if (OMP_LOOPXFORM_LOWERED (for_stmt))
 	return;
       break;
@@ -5010,6 +5086,10 @@ omp_maybe_apply_loop_xforms (tree *expr_p, tree for_clauses)
 	    error_at (EXPR_LOCATION (for_stmt),
 		      "non-constant iteration count of %<unroll full%> loop");
 	}
+      OMP_LOOPXFORM_LOWERED (for_stmt) = 1;
+      break;
+    case OMP_REVERSE:
+      omp_apply_reverse (for_stmt);
       OMP_LOOPXFORM_LOWERED (for_stmt) = 1;
       break;
     default:

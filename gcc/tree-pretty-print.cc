@@ -4040,6 +4040,10 @@ dump_generic_node (pretty_printer *pp, tree node, int spc, dump_flags_t flags,
       pp_string (pp, "#pragma omp unroll");
       goto dump_omp_loop;
 
+    case OMP_REVERSE:
+      pp_string(pp, "#pragma omp reverse");
+      goto dump_omp_loop;
+
     case OACC_LOOP:
       pp_string (pp, "#pragma acc loop");
       goto dump_omp_loop;

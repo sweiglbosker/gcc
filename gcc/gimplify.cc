@@ -2499,7 +2499,7 @@ last_stmt_in_scope (gimple *stmt)
   if (!stmt)
     return NULL;
 
-  auto last_stmt_in_seq = [] (gimple_seq s) 
+  auto last_stmt_in_seq = [] (gimple_seq s)
     {
       gimple_seq_node n;
       for (n = gimple_seq_last (s);
@@ -7231,6 +7231,7 @@ is_gimple_stmt (tree t)
     case OMP_LOOP:
     case OMP_TILE:
     case OMP_UNROLL:
+    case OMP_REVERSE:
     case OACC_LOOP:
     case OMP_SCAN:
     case OMP_SCOPE:
@@ -17304,6 +17305,7 @@ gimplify_omp_for (tree *expr_p, gimple_seq *pre_p)
       break;
     case OMP_TILE:
     case OMP_UNROLL:
+    case OMP_REVERSE:
       gcc_assert (inner_for_stmt == NULL_TREE);
       return gimplify_omp_loop_xform (expr_p, pre_p);
     default:
@@ -20993,6 +20995,7 @@ gimplify_expr (tree *expr_p, gimple_seq *pre_p, gimple_seq *post_p,
 	case OMP_TASKLOOP:
 	case OMP_TILE:
 	case OMP_UNROLL:
+	case OMP_REVERSE:
 	case OACC_LOOP:
 	  ret = gimplify_omp_for (expr_p, pre_p);
 	  break;

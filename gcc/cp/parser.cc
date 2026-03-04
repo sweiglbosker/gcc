@@ -49304,7 +49304,9 @@ cp_parser_next_tokens_can_be_canon_loop (cp_parser *parser, enum tree_code code,
 	  && ((cp_parser_pragma_kind (cp_lexer_peek_token (parser->lexer))
 	       == PRAGMA_OMP_UNROLL)
 	      || (cp_parser_pragma_kind (cp_lexer_peek_token (parser->lexer))
-		  == PRAGMA_OMP_TILE)))
+		  == PRAGMA_OMP_TILE)
+	      || (cp_parser_pragma_kind (cp_lexer_peek_token (parser->lexer))
+		  == PRAGMA_OMP_REVERSE)))
 	return true;
       /* Skip standard attributes on next for in case they are
 	 [[omp::directive (unroll partial (4))]] or
@@ -49326,6 +49328,7 @@ cp_parser_next_tokens_can_be_canon_loop (cp_parser *parser, enum tree_code code,
 
 static tree cp_parser_omp_unroll (cp_parser *, cp_token *, bool *);
 static tree cp_parser_omp_tile (cp_parser *, cp_token *, bool *);
+static tree cp_parser_omp_reverse(cp_parser *, cp_token *, bool *);
 
 /* This function parses a single level of a loop nest, invoking itself
    recursively if necessary.
@@ -49464,6 +49467,30 @@ cp_parser_omp_loop_nest (cp_parser *parser, bool *if_p)
 			count, omp_for_parse_state->count - depth);
 	      transform = error_mark_node;
 	    }
+	  break;
+	case PRAGMA_OMP_REVERSE:
+	  pragma_tok = cp_lexer_consume_token (parser->lexer);
+	  parser->lexer->in_pragma = true;
+	  body = push_stmt_list ();
+	  stmt = push_omp_privatization_clauses (false);
+	  transform = cp_parser_omp_reverse (parser, pragma_tok, if_p);
+	  pop_omp_privatization_clauses (stmt);
+	  body = pop_stmt_list (body);
+	  if (transform == NULL_TREE || transform == error_mark_node)
+	    {
+	      transform = error_mark_node;
+	      break;
+	    }
+	  gcc_assert (TREE_CODE (transform) == OMP_REVERSE);
+	  if (omp_for_parse_state->count - depth > 1)
+	    {
+	      error_at (loc, "%<reverse%> construct generates just one loop with"
+		             "canonical form but %d loops are needed",
+		             omp_for_parse_state->count - depth);
+	      transform = error_mark_node;
+	    }
+	  else
+	    count = 1;
 	  break;
 	default:
 	  cp_parser_pragma (parser, pragma_stmt, NULL);
@@ -50996,6 +51023,26 @@ cp_parser_omp_parallel (cp_parser *parser, cp_token *pragma_tok,
   cp_parser_end_omp_structured_block (parser, save);
   stmt = finish_omp_parallel (clauses, block);
   return stmt;
+}
+
+/* OpenMP 6.0
+   # pragma omp reverse new-line
+     structured-block */
+
+static tree
+cp_parser_omp_reverse(cp_parser *parser, cp_token *pragma_tok, bool *if_p)
+{
+  tree block, ret;
+
+  cp_parser_require_pragma_eol (parser, pragma_tok);
+
+  block = begin_compound_stmt (0);
+  ret = cp_parser_omp_for_loop (parser, OMP_REVERSE, NULL_TREE, NULL, if_p);
+
+  block = finish_omp_structured_block (block);
+  add_stmt (block);
+
+  return ret;
 }
 
 /* OpenMP 2.5:
@@ -56504,6 +56551,9 @@ cp_parser_omp_construct (cp_parser *parser, cp_token *pragma_tok, bool *if_p)
       stmt = cp_parser_omp_parallel (parser, pragma_tok, p_name, mask, NULL,
 				     if_p);
       break;
+    case PRAGMA_OMP_REVERSE:
+      stmt = cp_parser_omp_reverse (parser, pragma_tok, if_p);
+      break;
     case PRAGMA_OMP_SCOPE:
       stmt = cp_parser_omp_scope (parser, pragma_tok, if_p);
       break;
@@ -57196,6 +57246,7 @@ cp_parser_pragma (cp_parser *parser, enum pragma_context context, bool *if_p)
     case PRAGMA_OMP_MASKED:
     case PRAGMA_OMP_MASTER:
     case PRAGMA_OMP_PARALLEL:
+    case PRAGMA_OMP_REVERSE:
     case PRAGMA_OMP_SCOPE:
     case PRAGMA_OMP_SECTIONS:
     case PRAGMA_OMP_SIMD:

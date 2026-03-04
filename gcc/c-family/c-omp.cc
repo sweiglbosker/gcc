@@ -1633,6 +1633,7 @@ c_find_nested_loop_xform_r (tree *tp, int *walk_subtrees, void *)
     {
     case OMP_TILE:
     case OMP_UNROLL:
+    case OMP_REVERSE:
       return *tp;
     case BIND_EXPR:
       *walk_subtrees = 1;
@@ -4680,6 +4681,8 @@ const struct c_omp_directive c_omp_directives[] = {
     C_OMP_DIR_INFORMATIONAL, false },
   { "scan", nullptr, nullptr, PRAGMA_OMP_SCAN,
     C_OMP_DIR_CONSTRUCT, true },
+  { "reverse", nullptr, nullptr, PRAGMA_OMP_REVERSE,
+    C_OMP_DIR_CONSTRUCT, false },
   { "scope", nullptr, nullptr, PRAGMA_OMP_SCOPE,
     C_OMP_DIR_CONSTRUCT, false },
   { "section", nullptr, nullptr, PRAGMA_OMP_SECTION,

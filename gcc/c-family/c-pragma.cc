@@ -1554,6 +1554,7 @@ static const struct omp_pragma_def omp_pragmas_simd[] = {
   { "master", PRAGMA_OMP_MASTER },
   { "ordered", PRAGMA_OMP_ORDERED },
   { "parallel", PRAGMA_OMP_PARALLEL },
+  { "reverse", PRAGMA_OMP_REVERSE },
   { "scan", PRAGMA_OMP_SCAN },
   { "simd", PRAGMA_OMP_SIMD },
   { "target", PRAGMA_OMP_TARGET },
